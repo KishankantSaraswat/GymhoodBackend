@@ -1,8 +1,8 @@
-import express from "express"; 
-import {config} from "dotenv"; config({path:"./config/config.env"});
+import express from "express";
+import { config } from "dotenv"; config({ path: "./config/config.env" });
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import {connectDB} from "./database/db.js"; 
+import { connectDB } from "./database/db.js";
 import { errorMiddleware } from "./middlewares/errorMiddlewares.js";
 import authRouter from "./routes/authRouter.js"
 import gymShoodRouter from "./routes/1_gymShoodDbRoute.js"
@@ -13,7 +13,7 @@ import healthChgymsHoodeckRouter from "./routes/healthCheck.js"
 import userDataRouter from "./routes/userDataRoutes.js";
 
 
-export const app=express(); 
+export const app = express();
 
 import dotenv from 'dotenv';
 dotenv.config({ path: './config/config.env' });
@@ -21,15 +21,15 @@ import { OAuth2Client } from 'google-auth-library';
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 app.use(cors({
-    origin: ['http://147.93.30.41:5001','http://127.0.0.1:5500', 'http://localhost:5500', 'https://gyms-hood.vercel.app', 'http://localhost:3000', 'http://localhost:3000/googleAuth',],
-        method:["GET","POST","PUT","DELETE"],
-    credentials: true
+  origin: ['http://147.93.30.41:5001', 'http://127.0.0.1:5500', 'http://localhost:5500', 'https://gyms-hood.vercel.app', 'http://localhost:3000', 'http://localhost:3000/googleAuth',],
+  method: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
 
 
 app.use(cookieParser());
-app.use(express.json()); 
-app.use(express.urlencoded({extended:true})); //data conversion (backend(json) && frontend)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); //data conversion (backend(json) && frontend)
 
 
 // In your backend (app.js)
@@ -37,10 +37,10 @@ app.use(express.json()); // for parsing application/json
 app.use(express.urlencoded({ extended: true })); // for parsing form data
 
 // app.use("")
-app.use("/auth",authRouter); //staticUri
-app.use("/gymdb",gymShoodRouter);
-app.use("/admin",adminRouter);
-app.use("/payment",paymentRouter); 
+app.use("/auth", authRouter); //staticUri
+app.use("/gymdb", gymShoodRouter);
+app.use("/admin", adminRouter);
+app.use("/payment", paymentRouter);
 app.use("/user-data", userDataRouter);
 // app.use("/api",healthCheckRouter);
 
@@ -55,4 +55,14 @@ app.get("/ping", (req, res) => {
 
 connectDB();
 
-app.use(errorMiddleware); 
+
+app.use(errorMiddleware);
+
+// Start server if this file is run directly
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
