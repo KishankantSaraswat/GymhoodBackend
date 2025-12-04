@@ -3,9 +3,9 @@ import nodeMailer from "nodemailer";
 export const sendEmail = async ({ to, subject, message }) => {
     try {
         console.log("📧 Email Configuration:", {
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT,
-            service: process.env.SMTP_SERVICE,
+            host: "smtp-relay.brevo.com",
+            port: 587,
+            service: "Brevo (hardcoded)",
             from: process.env.SMTP_MAIL,
             to: to,
             hasPassword: !!process.env.SMTP_PASSWORD
