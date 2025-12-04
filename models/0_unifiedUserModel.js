@@ -76,6 +76,11 @@ const userSchema = new mongoose.Schema({
   verificationCodeExpire: Date,
   resetPasswordToken: String,
   resetPasswordExpire: Date,
+  // OTP-based password reset fields
+  resetPasswordOTP: Number,
+  resetPasswordOTPExpire: Date,
+  resetPasswordSessionId: String,
+  resetPasswordSessionExpire: Date,
   isDeleted: { type: Boolean, default: false } //soft delete
 }, { timestamps: true });
 

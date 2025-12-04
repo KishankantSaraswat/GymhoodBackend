@@ -5,10 +5,13 @@ import User from "../models/0_unifiedUserModel.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { sendToken } from "../utils/sendToken.js";
+import { sendEmail } from "../utils/sendEmail.js";
+import { sendVerificationCode } from "../utils/sendVerificationCode.js";
+import { generateForgotPasswordEmailTemplate, generateVerificationOtpEmailTemplate } from "../utils/emailTemplate.js";
 import { OAuth2Client } from "google-auth-library";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Register: create user and auto‑verify (skip OTP)
+// Register: create user and send OTP
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password, role, phone, height, weight, gender, foodType } = req.body;
   if (!name || !email || !password || !role) {
@@ -19,10 +22,15 @@ export const register = catchAsyncErrors(async (req, res, next) => {
   }
   const hashedPassword = await bcrypt.hash(password, 10);
   const existing = await User.findOne({ email });
+
   if (existing && existing.accountVerified && existing.isPwdAuth) {
     return next(new ErrorHandler("User already exists.", 400));
   }
+
   const registrationSessionId = crypto.randomUUID();
+  const verificationCode = Math.floor(100000 + Math.random() * 900000); // Generate 6-digit OTP
+  const verificationCodeExpire = Date.now() + 15 * 60 * 1000; // 15 minutes expiry
+
   let user;
   if (existing) {
     // Update existing record (e.g., after previous failed attempt)
@@ -30,11 +38,11 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     existing.password = hashedPassword;
     existing.role = role;
     existing.phone = phone || existing.phone;
-    existing.accountVerified = true;
+    existing.accountVerified = false; // Ensure not verified yet
     existing.isPwdAuth = true;
-    existing.verificationCode = null;
-    existing.verificationCodeExpire = null;
-    existing.registrationSessionId = null;
+    existing.verificationCode = verificationCode;
+    existing.verificationCodeExpire = verificationCodeExpire;
+    existing.registrationSessionId = registrationSessionId;
     await existing.save();
     user = existing;
   } else {
@@ -45,8 +53,10 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       role,
       phone: phone || undefined,
       registrationSessionId,
-      accountVerified: true,
+      accountVerified: false, // Default to false
       isPwdAuth: true,
+      verificationCode,
+      verificationCodeExpire,
     });
     await user.save();
   }
@@ -80,24 +90,56 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
-  // Respond as if OTP was sent, but user is already verified
-  res.status(200).json({
-    success: true,
-    message: "User registered and auto‑verified (OTP skipped).",
-    registrationSessionId,
-  });
+  // Send OTP
+  try {
+    await sendVerificationCode(verificationCode, email, res, registrationSessionId);
+  } catch (error) {
+    user.verificationCode = null;
+    user.verificationCodeExpire = null;
+    await user.save();
+    return next(new ErrorHandler("Failed to send verification email.", 500));
+  }
 });
 
-// verifyOTP: no‑op, just return success (user already verified)
+// verifyOTP: Verify the code and activate account
 export const verifyOTP = catchAsyncErrors(async (req, res, next) => {
   const { otp } = req.body;
   const email = req.cookies.email || req.body.email;
   const registrationSessionId = req.cookies.reg_session || req.body.registrationSessionId;
+
   if (!email || !otp || !registrationSessionId) {
     return next(new ErrorHandler("Required fields are missing.", 400));
   }
-  // Since registration auto‑verifies, simply respond success
-  res.status(200).json({ success: true, message: "OTP verification skipped (user already verified)." });
+
+  const user = await User.findOne({
+    email,
+    registrationSessionId,
+  });
+
+  if (!user) {
+    return next(new ErrorHandler("Invalid session or user not found.", 400));
+  }
+
+  if (user.accountVerified) {
+    return res.status(200).json({ success: true, message: "User already verified." });
+  }
+
+  if (user.verificationCode !== Number(otp)) {
+    return next(new ErrorHandler("Invalid OTP.", 400));
+  }
+
+  if (user.verificationCodeExpire < Date.now()) {
+    return next(new ErrorHandler("OTP expired. Please register again.", 400));
+  }
+
+  // OTP is valid
+  user.accountVerified = true;
+  user.verificationCode = null;
+  user.verificationCodeExpire = null;
+  user.registrationSessionId = null;
+  await user.save();
+
+  sendToken(user, 200, "Account verified successfully.", res);
 });
 
 // Login with Debug Logs
@@ -231,16 +273,146 @@ export const updateUserProfile = catchAsyncErrors(async (req, res, next) => {
 
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   if (!req.body.email) return next(new ErrorHandler("Email is required.", 400));
-  const user = await User.findOne({ email: req.body.email, accountVerified: true });
+
+  const user = await User.findOne({
+    email: req.body.email,
+    accountVerified: true,
+  });
+
   if (!user) return next(new ErrorHandler("Invalid email.", 400));
-  if (!user.isPwdAuth) return next(new ErrorHandler("Use Google Sign-In to log in, or register with your email and password.", 400));
-  // ... (rest of forgot password logic unchanged) ...
-  res.status(200).json({ success: true, message: "Password reset email sent (placeholder)." });
+
+  if (!user.isPwdAuth) {
+    return next(new ErrorHandler("Use Google Sign-In to log in, or register with your email and password.", 400));
+  }
+
+  if (!user.forgotPasswordAttemptsExpire || user.forgotPasswordAttemptsExpire < Date.now()) {
+    user.forgotPasswordAttempts = 0;
+    user.forgotPasswordAttemptsExpire = Date.now() + 60 * 60 * 1000; // 1 hour expiry
+  }
+
+  if (user.forgotPasswordAttempts >= 3) {
+    return next(new ErrorHandler("Too many reset requests. Try again after 1 hour.", 429));
+  }
+
+  user.forgotPasswordAttempts += 1;
+
+  // Generate 6-digit OTP
+  const resetOTP = Math.floor(100000 + Math.random() * 900000);
+  user.resetPasswordOTP = resetOTP;
+  user.resetPasswordOTPExpire = Date.now() + 15 * 60 * 1000; // 15 minutes expiry
+
+  await user.save({ validateBeforeSave: false });
+
+  const message = generateVerificationOtpEmailTemplate(resetOTP);
+
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: "🔐 Reset Your gymsHood Password - OTP Verification",
+      message,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `OTP sent to ${user.email} successfully.`,
+    });
+  } catch (error) {
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new ErrorHandler("Failed to send OTP email.", 500));
+  }
+});
+
+export const verifyResetOTP = catchAsyncErrors(async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return next(new ErrorHandler("Email and OTP are required.", 400));
+  }
+
+  const user = await User.findOne({ email, accountVerified: true });
+
+  if (!user) {
+    return next(new ErrorHandler("Invalid email.", 400));
+  }
+
+  if (!user.resetPasswordOTP) {
+    return next(new ErrorHandler("No OTP request found. Please request a new OTP.", 400));
+  }
+
+  if (user.resetPasswordOTP !== Number(otp)) {
+    return next(new ErrorHandler("Invalid OTP.", 400));
+  }
+
+  if (user.resetPasswordOTPExpire < Date.now()) {
+    return next(new ErrorHandler("OTP expired. Please request a new one.", 400));
+  }
+
+  // OTP is valid, create reset session
+  const resetSessionId = crypto.randomUUID();
+  user.resetPasswordSessionId = resetSessionId;
+  user.resetPasswordSessionExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordOTPExpire = undefined;
+
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully.",
+    resetSessionId,
+  });
 });
 
 export const resetPassword = catchAsyncErrors(async (req, res, next) => {
-  // Placeholder implementation – actual reset logic omitted for brevity
-  res.status(200).json({ success: true, message: "Password reset successful (placeholder)." });
+  const { resetSessionId, password, confirmPassword } = req.body;
+
+  if (!resetSessionId) {
+    return next(new ErrorHandler("Reset session ID is required.", 400));
+  }
+
+  const user = await User.findOne({
+    resetPasswordSessionId: resetSessionId,
+    resetPasswordSessionExpire: { $gt: Date.now() },
+  }).select("+password");
+
+  if (!user) {
+    return next(new ErrorHandler("Invalid or expired reset session.", 400));
+  }
+
+  const newPassword = String(password).trim();
+  const confirmPass = String(confirmPassword).trim();
+
+  if (newPassword !== confirmPass) {
+    return next(new ErrorHandler("Password & confirm password don't match.", 400));
+  }
+
+  if (await bcrypt.compare(newPassword, user.password)) {
+    return next(new ErrorHandler("New password must be different from the old password.", 400));
+  }
+
+  if (newPassword.length < 8 || newPassword.length > 16) {
+    return next(new ErrorHandler("Password must be between 8 & 16 characters.", 400));
+  }
+
+  if (/^0+$/.test(newPassword)) {
+    return next(new ErrorHandler("Password cannot be all zeros.", 400));
+  }
+
+  const invalidChars = newPassword.match(/[^a-zA-Z0-9!@#$%^&*]/);
+  if (invalidChars) {
+    return next(new ErrorHandler(`Invalid character(s) in password: ${invalidChars.join(", ")}`, 400));
+  }
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  user.resetPasswordSessionId = undefined;
+  user.resetPasswordSessionExpire = undefined;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+
+  await user.save();
+  sendToken(user, 200, "Password reset successfully. Please log in again.", res);
 });
 
 // Placeholder for updatePassword (not used in simplified flow)

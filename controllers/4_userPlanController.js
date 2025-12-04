@@ -13,7 +13,14 @@ import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail.js"; // Adjust path as needed
 
 
-const razorpay = createRazorpayInstance();
+// Lazy initialization of Razorpay instance
+let razorpayInstance = null;
+const getRazorpay = () => {
+  if (!razorpayInstance) {
+    razorpayInstance = createRazorpayInstance();
+  }
+  return razorpayInstance;
+};
 // import Contact from "../models/1_contactModel.js"
 // import axios from 'axios';
 
@@ -61,7 +68,7 @@ export const purchasePlan = catchAsyncErrors(async (req, res, next) => {
         gymId: plan.gymId._id.toString() // Explicitly use _id.toString() && all because while fetching plan..i populated it with gymId
       }
     };
-    const order = await razorpay.orders.create(orderOptions);
+    const order = await getRazorpay().orders.create(orderOptions);
     // console.log( order);
     // console.log("Api key:   ", process.env.RAZORPAY_API_KEY_ID);
 
@@ -154,7 +161,7 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
     }
 
     // 2. Fetch payment details from Razorpay
-    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    const payment = await getRazorpay().payments.fetch(razorpay_payment_id);
     console.log('[VerifyPayment] Razorpay payment details', {
       paymentStatus: payment.status,
       amount: payment.amount,
@@ -162,7 +169,7 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
     });
 
     // 3. Get plan and gym details with robust error handling
-    const order = await razorpay.orders.fetch(razorpay_order_id);
+    const order = await getRazorpay().orders.fetch(razorpay_order_id);
     const orderNotes = order.notes;
 
     // console.log("0");
@@ -356,7 +363,7 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
     // Attempt refund if payment was captured
     if (razorpay_payment_id && walletTransaction) {
       try {
-        const refund = await razorpay.payments.refund(razorpay_payment_id, {
+        const refund = await getRazorpay().payments.refund(razorpay_payment_id, {
           amount: walletTransaction.amount * 100,
           speed: 'normal',
           notes: {
@@ -431,7 +438,7 @@ export const processRefund = catchAsyncErrors(async (req, res, next) => {
     }
 
     // 5. Process refund to customer
-    const refund = await razorpay.payments.refund(originalTx.razorpayPaymentId, {
+    const refund = await getRazorpay().payments.refund(originalTx.razorpayPaymentId, {
       amount: refundAmount * 100,
       notes: { reason } //provided from frontend
     });

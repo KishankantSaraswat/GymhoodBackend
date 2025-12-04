@@ -7,6 +7,7 @@ import {
   register,
   resetPassword,
   verifyOTP,
+  verifyResetOTP,
   updatePassword,
   googleLogin,
   updateUserLocation,
@@ -70,12 +71,11 @@ router.get("/logout", isAuthenticated, logout);
 router.get("/profile", isAuthenticated, getUser);
 router.put("/profile", isAuthenticated, updateUserProfile);
 router.post("/password/forgot", forgotPassword); //if authenticated..then also no problem
-router.put("/password/reset/:token", resetPassword);
-router.put("/password/update",isAuthenticated,updatePassword);
+router.post("/password/verify-reset-otp", verifyResetOTP);
+router.put("/password/reset", resetPassword);
+router.put("/password/update", isAuthenticated, updatePassword);
 
 router.post("/google-login", googleLogin);// }
 router.put('/user/location', isAuthenticated, updateUserLocation);
 
 export default router;
-
-

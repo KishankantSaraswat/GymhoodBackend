@@ -1,72 +1,49 @@
 import nodeMailer from "nodemailer";
 
-//mailSending issue: generate new appPassword-->simple & most Effective solution:
-const getSmtpAccounts = () => [
-    {
-        host: process.env.SMTP_HOST, // Gets fresh env values when called
-        service: process.env.SMTP_SERVICE,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_MAIL,
-        pass: process.env.SMTP_PASSWORD
-    },
-
-    //   {
-    //     host: process.env.SMTP1_HOST, 
-    //     service: process.env.SMTP1_SERVICE,
-    //     port: process.env.SMTP1_PORT,
-    //     user: process.env.SMTP1_MAIL,
-    //     pass: process.env.SMTP1_PASSWORD
-    //   },
-
-    //   {
-    //         host: process.env.SMTP2_HOST,
-    //         service: process.env.SMTP2_SERVICE,
-    //         port: process.env.SMTP2_PORT,
-    //         user: process.env.SMTP2_MAIL,
-    //         pass: process.env.SMTP2_PASSWORD,
-    //     },
-    //     {
-    //         host: process.env.SMTP3_HOST,
-    //         service: process.env.SMTP3_SERVICE,
-    //         port: process.env.SMTP3_PORT,
-    //         user: process.env.SMTP3_MAIL,
-    //         pass: process.env.SMTP3_PASSWORD,
-    //     },
-];
-
-// Email counter and index tracker
-let emailCount = 0;
-let currentIndex = 0;
-
-import nodemailer from "nodemailer";
-
 export const sendEmail = async ({ to, subject, message }) => {
     try {
-        // console.log(process.env.HOSTINGER_MAIL,process.env.HOSTINGER_PASS)
-        const transporter = nodemailer.createTransport({
-            host: "smtp.hostinger.com",
-            port: 465, // use 587 for TLS
-            secure: true, // true for port 465, false for 587
+        console.log("📧 Email Configuration:", {
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            service: process.env.SMTP_SERVICE,
+            from: process.env.SMTP_MAIL,
+            to: to,
+            hasPassword: !!process.env.SMTP_PASSWORD
+        });
+
+        const transporter = nodeMailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT),
+            service: process.env.SMTP_SERVICE,
+            secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
             auth: {
-                user: process.env.HOSTINGER_MAIL, // your full email like yourname@yourdomain.com
-                pass: process.env.HOSTINGER_PASS, // your email password
+                user: process.env.SMTP_MAIL,
+                pass: process.env.SMTP_PASSWORD,
             },
         });
 
+        // Verify connection
+        await transporter.verify();
+        console.log("✅ SMTP connection verified");
+
         const mailOptions = {
-            from: {
-                name: "GymsHood",
-                address: process.env.HOSTINGER_MAIL,
-            },
+            from: process.env.SMTP_MAIL,
             to,
             subject,
             html: message,
         };
-        console.log(mailOptions)
+
         const info = await transporter.sendMail(mailOptions);
-        console.log("📧 Email sent:", info.messageId);
+        console.log(`📧 Email sent successfully to ${to}`);
+        console.log(`📧 Message ID: ${info.messageId}`);
+        console.log(`📧 Response: ${info.response}`);
     } catch (error) {
-        console.error("❌ Failed to send email:", error.message);
-        throw new Error("Failed to send email");
+        console.error("❌ Failed to send email:", error);
+        console.error("❌ Error details:", {
+            message: error.message,
+            code: error.code,
+            command: error.command
+        });
+        throw new Error("Failed to send email: " + error.message);
     }
 };

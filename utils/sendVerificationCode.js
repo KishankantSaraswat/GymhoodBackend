@@ -1,18 +1,14 @@
 import { generateVerificationOtpEmailTemplate } from "./emailTemplate.js";
 import { sendEmail } from "./sendEmail.js";
 
-
 export async function sendVerificationCode(verificationCode, to, res, registrationSessionId) {
     try {
-        // TESTING MODE: Skip email sending, just return success
-        console.log(`📧 [TEST MODE] OTP for ${to}: ${verificationCode}`);
-
-        // const message = generateVerificationOtpEmailTemplate(verificationCode); 
-        // await sendEmail({
-        //     to,
-        //     subject: "Verification Code (GymsHood registration)",
-        //     message,
-        // });
+        const message = generateVerificationOtpEmailTemplate(verificationCode);
+        await sendEmail({
+            to,
+            subject: "Verification Code (GymsHood registration)",
+            message,
+        });
 
         // Set both cookie and return session ID in response
         res.status(200)
@@ -35,6 +31,7 @@ export async function sendVerificationCode(verificationCode, to, res, registrati
             });
 
     } catch (error) {
+        console.error("OTP Send Error:", error);
         return res.status(500).json({
             success: false,
             message: "Verification code failed to send.",

@@ -1,32 +1,14 @@
 import Razorpay from "razorpay";
-import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const envCandidates = [
-    path.resolve(process.cwd(), ".env"),
-    path.resolve(__dirname, "config.env"),
-];
-
-const didLoadEnv = envCandidates.some((envPath) => {
-    if (!fs.existsSync(envPath)) return false;
-    const { error } = dotenv.config({ path: envPath });
-    return !error;
-});
-
-if (!didLoadEnv) {
-    dotenv.config();
-}
 
 export const createRazorpayInstance = () => {
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+        console.error("❌ Razorpay configuration error:");
+        console.error("RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID ? "✓ Set" : "✗ Missing");
+        console.error("RAZORPAY_KEY_SECRET:", process.env.RAZORPAY_KEY_SECRET ? "✓ Set" : "✗ Missing");
         throw new Error("Razorpay keys not configured in environment variables");
     }
 
+    console.log("✅ Razorpay instance created successfully");
     return new Razorpay({
         key_id: process.env.RAZORPAY_KEY_ID,
         key_secret: process.env.RAZORPAY_KEY_SECRET,
