@@ -12,16 +12,15 @@ export const sendEmail = async ({ to, subject, message }) => {
         });
 
         const transporter = nodeMailer.createTransport({
-            host: process.env.SMTP_HOST,   // e.g. smtp.gmail.com or smtp-relay.brevo.com
-            port: 587,                     // MUST be 587 for Render
-            secure: false,                 // NO SSL
-            requireTLS: true,              // Force TLS
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT),
+            service: process.env.SMTP_SERVICE,
+            secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
             auth: {
                 user: process.env.SMTP_MAIL,
                 pass: process.env.SMTP_PASSWORD,
             },
         });
-
 
         // Verify connection
         await transporter.verify();
