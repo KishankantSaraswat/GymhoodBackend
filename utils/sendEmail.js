@@ -4,8 +4,8 @@ export const sendEmail = async ({ to, subject, message }) => {
     try {
         console.log("📧 Email Configuration:", {
             host: "smtp-relay.brevo.com",
-            port: 587,
-            service: "Brevo (hardcoded)",
+            port: 465,
+            service: "Brevo (SSL)",
             from: process.env.SMTP_MAIL,
             to: to,
             hasPassword: !!process.env.SMTP_PASSWORD
@@ -13,13 +13,15 @@ export const sendEmail = async ({ to, subject, message }) => {
 
         const transporter = nodeMailer.createTransport({
             host: "smtp-relay.brevo.com",
-            port: 587,
-            secure: false, // false for port 587
-            requireTLS: true, // force TLS
+            port: 465,
+            secure: true, // true for port 465 (SSL)
             auth: {
                 user: process.env.SMTP_MAIL,
                 pass: process.env.SMTP_PASSWORD,
             },
+            tls: {
+                rejectUnauthorized: false // Allow self-signed certificates
+            }
         });
 
         // Verify connection
