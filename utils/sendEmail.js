@@ -12,10 +12,10 @@ export const sendEmail = async ({ to, subject, message }) => {
         });
 
         const transporter = nodeMailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT),
-            service: process.env.SMTP_SERVICE,
-            secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+            host: "smtp-relay.brevo.com",
+            port: 587,
+            secure: false, // false for port 587
+            requireTLS: true, // force TLS
             auth: {
                 user: process.env.SMTP_MAIL,
                 pass: process.env.SMTP_PASSWORD,
