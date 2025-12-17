@@ -56,6 +56,17 @@ const userDataSchema = new mongoose.Schema({
     type: String,
     enum: ["Vegetarian", "Non-Vegetarian", "Vegan", "Eggetarian"],
   },
+  income: {
+    type: String,
+    enum: ["Less than 4 LPA", "4-9 LPA", "9+ LPA"],
+  },
+  pastInjury: {
+    type: String,
+  },
+  preferredGymTime: {
+    type: String,
+    enum: ["Early Morning (5-8 AM)", "Morning (8-11 AM)", "Afternoon (12-4 PM)", "Evening (5-8 PM)", "Night (8-11 PM)"],
+  },
 }, {
   timestamps: true
 });

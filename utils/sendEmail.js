@@ -1,43 +1,48 @@
-import * as brevo from '@getbrevo/brevo';
+import nodeMailer from "nodemailer";
 
 export const sendEmail = async ({ to, subject, message }) => {
     try {
         console.log("📧 Email Configuration:", {
-            method: "Brevo API (REST)",
-            from: process.env.SMTP_MAIL || "noreply@gymhood.com",
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            service: process.env.SMTP_SERVICE,
+            from: process.env.SMTP_MAIL,
             to: to,
-            hasApiKey: !!process.env.BREVO_API_KEY
+            hasPassword: !!process.env.SMTP_PASSWORD
         });
 
-        // Initialize Brevo API client
-        const apiInstance = new brevo.TransactionalEmailsApi();
-        apiInstance.setApiKey(
-            brevo.TransactionalEmailsApiApiKeys.apiKey,
-            process.env.BREVO_API_KEY
-        );
+        const transporter = nodeMailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT),
+            service: process.env.SMTP_SERVICE,
+            secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_MAIL,
+                pass: process.env.SMTP_PASSWORD,
+            },
+        });
 
-        // Prepare email data
-        const sendSmtpEmail = new brevo.SendSmtpEmail();
-        sendSmtpEmail.sender = {
-            email: process.env.SMTP_MAIL || "noreply@gymhood.com",
-            name: "GymHood"
+        // Verify connection
+        await transporter.verify();
+        console.log("✅ SMTP connection verified");
+
+        const mailOptions = {
+            from: process.env.SMTP_MAIL,
+            to,
+            subject,
+            html: message,
         };
-        sendSmtpEmail.to = [{ email: to }];
-        sendSmtpEmail.subject = subject;
-        sendSmtpEmail.htmlContent = message;
 
-        // Send email via Brevo API
-        const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
-
-        console.log(`✅ Email sent successfully to ${to}`);
-        console.log(`📧 Message ID: ${response.messageId}`);
-
-        return response;
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Email sent successfully to ${to}`);
+        console.log(`📧 Message ID: ${info.messageId}`);
+        console.log(`📧 Response: ${info.response}`);
     } catch (error) {
         console.error("❌ Failed to send email:", error);
         console.error("❌ Error details:", {
             message: error.message,
-            response: error.response?.text || error.response?.body
+            code: error.code,
+            command: error.command
         });
         throw new Error("Failed to send email: " + error.message);
     }

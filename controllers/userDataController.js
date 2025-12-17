@@ -18,7 +18,10 @@ export const createUserData = async (req, res) => {
       alcoholConsumption,
       dailyWaterIntake,
       foodAllergies,
-      foodType
+      foodType,
+      income,
+      pastInjury,
+      preferredGymTime
     } = req.body;
 
     // Use findOneAndUpdate with upsert to create or update
@@ -40,6 +43,9 @@ export const createUserData = async (req, res) => {
         dailyWaterIntake,
         foodAllergies,
         foodType,
+        income,
+        pastInjury,
+        preferredGymTime,
       },
       {
         new: true,

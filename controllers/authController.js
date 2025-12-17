@@ -13,7 +13,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Register: create user and send OTP
 export const register = catchAsyncErrors(async (req, res, next) => {
-  const { name, email, password, role, phone, height, weight, gender, foodType } = req.body;
+  const { name, email, password, role, phone, height, weight, gender, foodType, address, pincode } = req.body;
   if (!name || !email || !password || !role) {
     return next(new ErrorHandler("Please enter all fields.", 400));
   }
@@ -38,6 +38,13 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     existing.password = hashedPassword;
     existing.role = role;
     existing.phone = phone || existing.phone;
+    if (address || pincode) {
+      existing.location = {
+        address: address || existing.location?.address,
+        pincode: pincode || existing.location?.pincode,
+        coordinates: existing.location?.coordinates
+      };
+    }
     existing.accountVerified = false; // Ensure not verified yet
     existing.isPwdAuth = true;
     existing.verificationCode = verificationCode;
@@ -46,7 +53,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     await existing.save();
     user = existing;
   } else {
-    user = new User({
+    const userData = {
       name,
       email,
       password: hashedPassword,
@@ -57,7 +64,17 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       isPwdAuth: true,
       verificationCode,
       verificationCodeExpire,
-    });
+    };
+
+    // Add location data if address or pincode is provided
+    if (address || pincode) {
+      userData.location = {
+        address: address || undefined,
+        pincode: pincode || undefined
+      };
+    }
+
+    user = new User(userData);
     await user.save();
   }
 
@@ -237,7 +254,7 @@ export const getUser = catchAsyncErrors(async (req, res, next) => {
 
 export const updateUserProfile = catchAsyncErrors(async (req, res, next) => {
   const userId = req.user._id;
-  const { name, phone } = req.body;
+  const { name, phone, address, pincode } = req.body;
 
   const updateData = {};
   if (name !== undefined) {
@@ -248,6 +265,17 @@ export const updateUserProfile = catchAsyncErrors(async (req, res, next) => {
   }
   if (phone !== undefined) {
     updateData.phone = phone ? phone.trim() : null;
+  }
+
+  // Handle address and pincode updates
+  if (address !== undefined || pincode !== undefined) {
+    // Get current user to preserve existing location data
+    const currentUser = await User.findById(userId);
+    updateData.location = {
+      address: address !== undefined ? (address ? address.trim() : undefined) : currentUser?.location?.address,
+      pincode: pincode !== undefined ? (pincode ? pincode.trim() : undefined) : currentUser?.location?.pincode,
+      coordinates: currentUser?.location?.coordinates
+    };
   }
 
   if (Object.keys(updateData).length === 0) {
