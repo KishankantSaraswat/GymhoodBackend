@@ -271,30 +271,7 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
     console.log('[VerifyPayment] User plan created', {
       userPlanId: userPlan[0]._id
     });
-    const user = await User.findById(userId).select("name email");
 
-    const emailContent = `
-  <h2>Hi ${user.name || "User"},</h2>
-  <p>Thank you for purchasing the <strong>${plan.name}</strong> plan from <strong>${gym.name}</strong>.</p>
-  <p>Here are your plan details:</p>
-  <ul>
-    <li><strong>Plan Name:</strong> ${plan.name}</li>
-    <li><strong>Amount Paid:</strong> ₹${walletTransaction.amount}</li>
-    <li><strong>Duration:</strong> ${plan.planType} (${plan.duration} hours)</li>
-    <li><strong>Purchase Date:</strong> ${new Date().toLocaleDateString()}</li>
-  </ul>
-  <p>You can now start visiting your gym using this plan!</p>
-  <p>Stay fit,<br/>Team GymsHood</p>
-`;
-
-    // Send the email
-    await sendEmail({
-      to: user.email,
-      subject: "🎉 Plan Purchase Confirmation - GymsHood",
-      message: emailContent
-    });
-
-    console.log('[VerifyPayment] Purchase confirmation email sent');
     // 7. Update gym revenue
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -305,7 +282,7 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
         gymId: plan.gymId,
         date: today
       },
-      { $inc: { revenue: gymShare } }, //with gymShare
+      { $inc: { revenue: gymShare } },
       { upsert: true, session }
     );
 
@@ -338,6 +315,33 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
 
     await session.commitTransaction();
     console.log('[VerifyPayment] Transaction committed successfully');
+
+    // 9. Send confirmation email (Outside transaction to prevent rollback on timeout)
+    try {
+      const user = await User.findById(userId).select("name email");
+      const emailContent = `
+        <h2>Hi ${user.name || "User"},</h2>
+        <p>Thank you for purchasing the <strong>${plan.name}</strong> plan from <strong>${gym.name}</strong>.</p>
+        <p>Here are your plan details:</p>
+        <ul>
+          <li><strong>Plan Name:</strong> ${plan.name}</li>
+          <li><strong>Amount Paid:</strong> ₹${walletTransaction.amount}</li>
+          <li><strong>Duration:</strong> ${plan.planType} (${plan.duration} hours)</li>
+          <li><strong>Purchase Date:</strong> ${new Date().toLocaleDateString()}</li>
+        </ul>
+        <p>You can now start visiting your gym using this plan!</p>
+        <p>Stay fit,<br/>Team GymsHood</p>
+      `;
+
+      await sendEmail({
+        to: user.email,
+        subject: "🎉 Plan Purchase Confirmation - GymsHood",
+        message: emailContent
+      });
+      console.log('[VerifyPayment] Purchase confirmation email sent');
+    } catch (emailError) {
+      console.error('[VerifyPayment] Email delivery failed:', emailError.message);
+    }
 
     res.status(200).json({
       success: true,
