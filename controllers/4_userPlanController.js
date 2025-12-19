@@ -102,7 +102,7 @@ export const purchasePlan = catchAsyncErrors(async (req, res, next) => {
     res.status(200).json({
       success: true,
       order,
-      key: process.env.RAZORPAY_API_KEY_ID,
+      key: process.env.RAZORPAY_KEY_ID,
       walletTransactionId: walletTransaction[0]._id
     });
 
@@ -122,18 +122,16 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
 
   // Signature Verification
   const generatedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_SECRET_KEY)
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest("hex");
 
   if (generatedSignature !== razorpay_signature) {
-    console.error('[VerifyPayment] Signature verification failed'
-      //   ,{
-      // received: razorpay_signature,
-      // generated: generatedSignature
-      // }
-    );
-    return next(new ErrorHandler("Payment verification failed", 400));
+    console.error('[VerifyPayment] Signature verification failed', {
+      received: razorpay_signature,
+      generated: generatedSignature
+    });
+    return next(new ErrorHandler("Payment verification failed - Invalid signature", 400));
   }
 
   const session = await mongoose.startSession();
