@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +12,8 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.FILE_SERVER_PORT || 5000;
+
+app.use(cors());
 
 
 // Allowed MIME types
@@ -34,12 +37,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
- const uniqueName = `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`;    
+    const uniqueName = `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`;
     cb(null, uniqueName);
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
@@ -60,7 +63,8 @@ app.use('/files', express.static(path.join(__dirname, 'uploads'), {
   dotfiles: 'deny',
   index: false,
   setHeaders: (res, path) => {
-    res.set('Content-Security-Policy', "default-src 'none';");
+    // res.set('Content-Security-Policy', "default-src 'none';");
+    res.set('Access-Control-Allow-Origin', '*');
   }
 }));
 
@@ -73,7 +77,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
   }
 
   const fileUrl = `${req.protocol}://${req.get('host')}/files/${req.file.filename}`;
-  
+
   res.status(201).json({
     success: true,
     message: 'File uploaded successfully',
@@ -124,28 +128,28 @@ app.get('/files', (req, res) => {
 app.delete('/files', (req, res) => {
   const name = req.query.name;
   const type = req.query.type;
-if (!name || !type) {
+  if (!name || !type) {
     return res.status(400).json({ error: 'Missing "name" or "type" query parameters' });
   }
-const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.mov', '.avi', '.pdf'];
+  const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.mov', '.avi', '.pdf'];
   const ext = type.startsWith('.') ? type.toLowerCase() : '.' + type.toLowerCase();
-if (!safeExt.includes(ext)) {
+  if (!safeExt.includes(ext)) {
     return res.status(400).json({ error: 'Invalid file type extension' });
   }
-const safeFilename = path.basename(name) + ext;
+  const safeFilename = path.basename(name) + ext;
   const filePath = path.join(__dirname, 'uploads', safeFilename);
-// Prevent path traversal
+  // Prevent path traversal
   if (!filePath.startsWith(path.join(__dirname, 'uploads'))) {
     return res.status(403).json({ error: 'Access denied' });
   }
-if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'File not found' });
   }
-fs.unlink(filePath, (err) => {
+  fs.unlink(filePath, (err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to delete file' });
     }
-res.json({
+    res.json({
       success: true,
       message: 'File deleted successfully',
       filename: safeFilename
@@ -156,14 +160,14 @@ res.json({
 // Error handling middleware
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'File upload error',
-      message: err.message 
+      message: err.message
     });
   } else if (err) {
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Server error',
-      message: err.message 
+      message: err.message
     });
   }
   next();
