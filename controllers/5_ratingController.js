@@ -159,8 +159,7 @@ export const getGymRatings = catchAsyncErrors(async (req, res, next) => {
 
   // Calculate average rating
   const avgRating = await GymRating.aggregate([
-    // { $match: { gymId: mongoose.Types.ObjectId(gymId) } },
-    { $match: { gymId } },
+    { $match: { gymId: new mongoose.Types.ObjectId(gymId) } },
     { $group: { _id: null, average: { $avg: "$rating" } } }
   ]);
 
@@ -172,8 +171,8 @@ export const getGymRatings = catchAsyncErrors(async (req, res, next) => {
       rating: r.rating,
       feedback: r.feedback,
       user: {
-        name: r.userId.name,
-        profile_picture: r.userId.profile_picture || null
+        name: r.userId?.name || "Anonymous",
+        profile_picture: r.userId?.profile_picture || null
       },
       createdAt: r.createdAt
     }))
@@ -190,7 +189,7 @@ export const updateRating = catchAsyncErrors(async (req, res, next) => {
     { rating: stars, feedback: comment },
     { new: true }
   );
-  
+
 
   if (!rating) {
     return next(new ErrorHandler("Rating not found", 404));
