@@ -9,13 +9,13 @@ import {
   // updateEquipment,
   getGymsByOwner,
 
-  
+
   createGymAnnouncement,
   getUserAnnouncementsByGym,
   deleteGymAnnouncement,
   toggleGymStatus,
   addUpdateVerificationDocuments,
-  
+
 
   // createContactAndFundAccount,
   // submitGymOwnerKYC,
@@ -27,7 +27,7 @@ import {
 import {
   createPlan,
   getGymPlans,
-  updatePlan,  
+  updatePlan,
   getPlanNameById,
   getGymPlansAdminView,
 } from "../controllers/3_planMang.js";
@@ -52,6 +52,7 @@ import {
   cleanExpiredUsers,
   getYearlyGymHeatmap,
   streak,
+  getActiveCapacity,
 } from "../controllers/4_userGymEntry.js";
 
 
@@ -104,9 +105,9 @@ const validatePlanCreation = [
   body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('discountPercent').isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0-100'),
   // body('planType').isIn(['day', 'monthly', 'yearly']).withMessage('Invalid plan type'),
-body('duration')
-  .isFloat({ gt: 0 }) // Allows numbers > 0, including decimals like 1.5
-  .withMessage('Workout duration must be a number greater than 0'),
+  body('duration')
+    .isFloat({ gt: 0 }) // Allows numbers > 0, including decimals like 1.5
+    .withMessage('Workout duration must be a number greater than 0'),
 
   (req, res, next) => {
     const errors = validationResult(req);
@@ -125,19 +126,19 @@ router.post("/gym/register", isAuthenticated, isGymOwner, validateGymRegistratio
 // router.delete("/gyms/:id",isAuthenticated,isGymOwner,deleteGym); //by adminOnly (not gymOwner)
 router.get('/me', isAuthenticated, (req, res) => { //also profileRoute in auth..
   res.status(200).json({
-      success: true,
-      userId: req.user._id, 
+    success: true,
+    userId: req.user._id,
   });
 });
-router.get("/gyms", getAllGyms); 
+router.get("/gyms", getAllGyms);
 router.get("/gym/:id", getGymDetails);
 router.put("/gym/:id", isAuthenticated, isGymOwner, updateGym); //will handel updateEquipment also
 router.post("/gym/:gymId/media", isAuthenticated, isGymOwner, addUpdateGymMedia); //also updateGymMedia
-router.get("/gym/owner/:ownerId", isAuthenticated, isGymOwner, getGymsByOwner); 
+router.get("/gym/owner/:ownerId", isAuthenticated, isGymOwner, getGymsByOwner);
 // Gym Management
 router.put("/gyms/status", isAuthenticated, isGymOwner, toggleGymStatus);
-router.put("/gyms/verification", 
-  isAuthenticated, 
+router.put("/gyms/verification",
+  isAuthenticated,
   isGymOwner,
   addUpdateVerificationDocuments
 );
@@ -151,8 +152,8 @@ router.post("/gyms/announcements",
 );
 
 router.get("/announcements/gym", isAuthenticated, getUserAnnouncementsByGym);
-router.delete("/announcements/gym/:announcementId", 
-  isAuthenticated, 
+router.delete("/announcements/gym/:announcementId",
+  isAuthenticated,
   isGymOwner,
   deleteGymAnnouncement
 );
@@ -166,10 +167,10 @@ router.get("/name/:id", getPlanNameById); // Route to get plan name by ID
 
 
 router.post("/plans/purchase", isAuthenticated, purchasePlan); //validatePayment, purchasePlan
-router.post("/plans/verifyPlanPayment",isAuthenticated,verifyPlanPayment); //no isAuth required..
+router.post("/plans/verifyPlanPayment", isAuthenticated, verifyPlanPayment); //no isAuth required..
 router.get("/plans/user", isAuthenticated, getUserPlans);
-router.get("/userPlans/gym",isAuthenticated, getPurchasedPlans);
-router.get("/api/transactions",isAuthenticated, getWalletTransactions);
+router.get("/userPlans/gym", isAuthenticated, getPurchasedPlans);
+router.get("/api/transactions", isAuthenticated, getWalletTransactions);
 // router.patch("/plans/:id/cancel", isAuthenticated, cancelPlan); //only for basicPlan (1day)
 router.get("/plans/usage/:planId", isAuthenticated, getPlanUsage); //userPlanId (as multiple_samePlan buy allowed)
 
@@ -193,6 +194,7 @@ router.get("/user/yearly-data", isAuthenticated, getYearlyGymHeatmap); // 5. Use
 router.get("/gym/:gymId/today-register", isAuthenticated, isGymOwner, getGymRegisterByDate); // 6. Gym Dashboard: Get Today’s Check-in Register
 router.get("/gym/:gymId/active-users", isAuthenticated, isGymOwner, getActiveUsers); // 7. Gym Dashboard: Get Active + Expired Users (un-checked-out)
 router.put("/gym/:gymId/clean-expired-users", isAuthenticated, isGymOwner, cleanExpiredUsers); // 8. Gym Dashboard: Clean Expired Users (checkOutTimeCalc < now)
+router.get("/gym/:gymId/active-capacity", getActiveCapacity); // 9. Get Active Capacity for Current Time Slot (Public)
 
 
 // Gym Dashboard Routes
