@@ -40,7 +40,8 @@ app.use(cors({
     'http://192.168.1.137:5000',
     'http://192.168.1.137:4000',
     'http://192.168.1.137:8081', // Native Expo dev port
-    'https://gymhoodbackend.onrender.com'
+    'https://gymhoodbackend.onrender.com',
+    'https://gymhood-partner-app.onrender.com'
   ],
   method: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
