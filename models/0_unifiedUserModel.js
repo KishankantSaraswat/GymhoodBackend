@@ -103,8 +103,11 @@ userSchema.methods.generateVerificationCode = function () {
 }
 
 userSchema.methods.generateToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET_KEY, {
-    expiresIn: process.env.JWT_EXPIRE || "7d", // Default to 7 days if env var is missing
+  const secret = process.env.JWT_SECRET_KEY?.trim().replace(/^["']|["']$/g, '');
+  if (!secret) console.error("🚨 Model generateToken: JWT_SECRET_KEY is missing!");
+
+  return jwt.sign({ id: this._id }, secret, {
+    expiresIn: process.env.JWT_EXPIRE || "7d",
   });
 }
 

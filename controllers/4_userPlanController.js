@@ -502,12 +502,13 @@ export const getPurchasedPlans = catchAsyncErrors(async (req, res, next) => {
     return res.status(404).json({ success: false, message: "Gym not found for this owner" });
   }
 
-  // Find all active (not expired) user plans for this gym
-  const activePlans = await UserPlan.find({ gymId: gym._id, isExpired: false })
+  // Find all user plans for this gym (active and expired)
+  const plans = await UserPlan.find({ gymId: gym._id })
     .sort({ purchaseDate: -1 })
-    .populate('userId', 'name email'); // optional, populate user info
+    .populate('userId', 'name email profile_picture')
+    .populate('planId', 'name price validity planType');
 
-  res.status(200).json({ success: true, plans: activePlans });
+  res.status(200).json({ success: true, plans });
 });
 
 

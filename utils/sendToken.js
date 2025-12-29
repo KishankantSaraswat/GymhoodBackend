@@ -1,4 +1,6 @@
 export const sendToken = (user, statusCode, message, res) => {
+    const key = (process.env.JWT_SECRET_KEY || "").trim();
+    console.log(`🔑 Token Generation - Key Fingerprint: ${key.substring(0, 2)}...${key.substring(key.length - 2)} (Length: ${key.length})`);
     const token = user.generateToken();
 
     const cookieExpireDays = process.env.COOKIE_EXPIRE || 5; // Default to 5 days
@@ -11,7 +13,7 @@ export const sendToken = (user, statusCode, message, res) => {
     };
 
     res.status(statusCode)
-        .cookie("token", token, options)
+        .cookie("gymshood_token", token, options)
         .json({
             success: true,
             user,

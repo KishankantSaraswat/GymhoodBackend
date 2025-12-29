@@ -4,14 +4,65 @@ import { catchAsyncErrors } from "./catchAsyncErrors.js";
 import ErrorHandler from "./errorMiddlewares.js"
 import jwt from "jsonwebtoken";
 
-export const isAuthenticated=catchAsyncErrors(async(req,res,next)=>{
-    const {token}=req.cookies; 
-    if(!token) return next(new ErrorHandler("User is not authenticated.",400));
-    const decoded=jwt.verify(token,process.env.JWT_SECRET_KEY);
-    req.user=await User.findById(decoded.id); 
-    // console.log(req.user);
-    next(); 
-}) 
+export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
+    let token;
+
+    // 1. Check Authorization header first (explicit token)
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1]?.trim();
+        console.log("🔍 Auth Middleware - Found token in Header");
+    }
+    // 2. Fallback to Cookies
+    else if (req.cookies.gymshood_token) {
+        token = req.cookies.gymshood_token.trim();
+        console.log("🔍 Auth Middleware - Found token in Cookie");
+    }
+
+    if (!token) {
+        console.log("❌ Auth Middleware - No token found in Header or Cookie");
+        return next(new ErrorHandler("User is not authenticated.", 401));
+    }
+
+    console.log(`🎫 Received Token: ${token.substring(0, 10)}... (Length: ${token.length})`);
+
+    // Strip quotes if any (e.g. JWT_SECRET_KEY="secret")
+    const secretKey = process.env.JWT_SECRET_KEY?.trim().replace(/^["']|["']$/g, '');
+
+    if (!secretKey) {
+        console.error("🚨 CRITICAL: JWT_SECRET_KEY is MISSING in backend config!");
+    } else {
+        console.log(`ℹ️ Auth Middleware - Key Fingerprint: ${secretKey.substring(0, 2)}...${secretKey.substring(secretKey.length - 2)} (Length: ${secretKey.length})`);
+    }
+
+    try {
+        // Decode without verification just for debugging
+        const payload = jwt.decode(token);
+        console.log("🎫 Token Payload (unverified):", payload);
+
+        if (!payload || !payload.id) {
+            console.error("🚨 SECURITY ALERT: Token payload is missing 'id'. Likely an external token.");
+            return next(new ErrorHandler("Detected a token from another application. Please click 'Reset Session' and log in again.", 401));
+        }
+
+        console.log("🔑 Auth Middleware - Verifying token...");
+        const decoded = jwt.verify(token, secretKey);
+        console.log("✅ Auth Middleware - Token verified, user ID:", decoded.id);
+        req.user = await User.findById(decoded.id);
+        if (!req.user) {
+            console.log("❌ Auth Middleware - User not found in DB");
+            return next(new ErrorHandler("User not found.", 404));
+        }
+        next();
+    } catch (error) {
+        console.error("❌ Auth Middleware - JWT Error:", error.message);
+
+        if (error.message === "invalid signature") {
+            return next(new ErrorHandler("Signature mismatch! Your token might be from another application or server instance. Please click 'Reset Session' and log in again.", 401));
+        }
+
+        return next(new ErrorHandler("Invalid or expired token.", 401));
+    }
+});
 
 // Role-based authorization middleware (both isAuthorized & requireRole is truely identical)
 
@@ -36,7 +87,7 @@ export const requireRole = (...allowedRoles) => {
         if (!allowedRoles.includes(req.user.role)) {
             return next(
                 new ErrorHandler(
-                    `Role ${req.user.role} is not authorized to access this resource.`, 
+                    `Role ${req.user.role} is not authorized to access this resource.`,
                     403
                 )
             );
@@ -63,7 +114,7 @@ export const isVerifiedUser = requireRole('Member', 'Trainer', 'Staff', 'GymOwne
 // Optional: Middleware to check if user owns the gym resource
 export const isGymResourceOwner = catchAsyncErrors(async (req, res, next) => {
     const gymId = req.params.id || req.body.gymId;
-    
+
     if (!gymId) {
         return next(new ErrorHandler("Gym ID not provided", 400));
     }

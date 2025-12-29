@@ -3,6 +3,7 @@ import { sendEmail } from "./sendEmail.js";
 
 export async function sendVerificationCode(verificationCode, to, res, registrationSessionId) {
     try {
+        console.log(`🔑 DEV ONLY: Verification Code for ${to} is: ${verificationCode}`);
         const message = generateVerificationOtpEmailTemplate(verificationCode);
         await sendEmail({
             to,

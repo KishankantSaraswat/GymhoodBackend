@@ -51,6 +51,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     existing.verificationCodeExpire = verificationCodeExpire;
     existing.registrationSessionId = registrationSessionId;
     await existing.save();
+    console.log(`👤 DB - Updated existing user: ${existing.email} (ID: ${existing._id}, Role: ${existing.role})`);
     user = existing;
   } else {
     const userData = {
@@ -76,6 +77,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
 
     user = new User(userData);
     await user.save();
+    console.log(`👤 DB - Created NEW user: ${user.email} (ID: ${user._id}, Role: ${user.role})`);
   }
 
   // Create UserData entry if fitness data is provided
@@ -151,8 +153,10 @@ export const verifyOTP = catchAsyncErrors(async (req, res, next) => {
 
   // OTP is valid
   user.accountVerified = true;
-  user.verificationCode = null;
-  user.verificationCodeExpire = null;
+  user.verificationCode = undefined;
+  user.verificationCodeExpire = undefined;
+  await user.save();
+  console.log(`✅ DB - User verified and activated: ${user.email} (Role: ${user.role})`);
   user.registrationSessionId = null;
   await user.save();
 
@@ -161,6 +165,8 @@ export const verifyOTP = catchAsyncErrors(async (req, res, next) => {
 
 // Login with Debug Logs
 export const login = catchAsyncErrors(async (req, res, next) => {
+  const key = process.env.JWT_SECRET_KEY || "";
+  console.log(`🔑 Login controller - Key Fingerprint: ${key.substring(0, 2)}...${key.substring(key.length - 2)} (Length: ${key.length})`);
   const { email, password, role } = req.body;
   console.log("🔑 Login Request:", { email, role });
 

@@ -28,6 +28,12 @@ const gymSchema = new Schema({
       }
     }
   },
+  pincode: {
+    type: String,
+    trim: true,
+    match: [/^\d{6}$/, 'Please enter a valid 6-digit pincode']
+  },
+
   capacity: {
     type: Number,
     required: [true, 'Capacity is required'],
@@ -59,6 +65,31 @@ const gymSchema = new Schema({
     type: String,
     required: [true, 'Phone number is required'],
     match: [/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,6}$/, 'Please enter a valid phone number']
+  },
+  alternatePhone: {
+    type: String,
+    match: [/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,6}$/, 'Please enter a valid phone number']
+  },
+  gymType: {
+    type: String,
+    enum: {
+      values: ['unisex', 'men-only', 'women-only', 'fitness-studio'],
+      message: 'Gym type must be unisex, men-only, women-only, or fitness-studio'
+    },
+    default: 'unisex'
+  },
+  facilities: {
+    type: [String],
+    default: []
+  },
+  onboardingStep: {
+    type: Number,
+    default: 1
+  },
+  onboardingStatus: {
+    type: String,
+    enum: ['pending', 'completed'],
+    default: 'pending'
   },
   about: {
     type: String,
@@ -167,8 +198,17 @@ gymSchema.virtual('isOpen').get(function () {
   if (this.status && this.status !== 'open') return false;
 
   const now = new Date();
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const options = { timeZone: 'Asia/Kolkata' };
+  const currentDay = now.toLocaleDateString('en-US', { ...options, weekday: 'long' }).toLowerCase();
+
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const [istHour, istMinute] = timeFormatter.format(now).split(':').map(Number);
+  const currentTime = istHour * 60 + istMinute;
 
   if (this.shifts && this.shifts.length > 0) {
     return this.shifts.some(shift => {
@@ -198,8 +238,17 @@ gymSchema.virtual('currentStatus').get(function () {
   if (this.status && this.status !== 'open') return { isOpen: false, message: 'Closed (Maintenance)' };
 
   const now = new Date();
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const options = { timeZone: 'Asia/Kolkata' };
+  const currentDay = now.toLocaleDateString('en-US', { ...options, weekday: 'long' }).toLowerCase();
+
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const [istHour, istMinute] = timeFormatter.format(now).split(':').map(Number);
+  const currentTime = istHour * 60 + istMinute;
 
   if (this.shifts && this.shifts.length > 0) {
     const activeShift = this.shifts.find(shift => {

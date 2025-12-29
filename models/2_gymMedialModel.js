@@ -7,6 +7,11 @@ const gymMediaSchema = new Schema({
   // mediaUrl: { type: String, required: true },
   mediaUrls: [{ type: String }],   // List of uploaded photo/video URLs
   logoUrl: { type: String },        // Optional logo
+  frontPhotoUrl: { type: String },
+  receptionPhotoUrl: { type: String },
+  workoutFloorPhotoUrl: { type: String },
+  lockerRoomPhotoUrl: { type: String },
+  trainerTeamPhotoUrl: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 

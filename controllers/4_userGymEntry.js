@@ -579,8 +579,20 @@ export const getActiveCapacity = catchAsyncErrors(async (req, res, next) => {
   const { gymId } = req.params;
   const today = new Date().toISOString().split("T")[0];
   const now = new Date();
-  const currentDay = now.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  // Use Intl.DateTimeFormat to get the current day and time in Asia/Kolkata timezone
+  const options = { timeZone: 'Asia/Kolkata' };
+  const currentDay = now.toLocaleDateString('en-US', { ...options, weekday: 'long' }).toLowerCase();
+
+  // Get current time in HH:MM format in IST
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const [istHour, istMinute] = timeFormatter.format(now).split(':').map(Number);
+  const currentTime = istHour * 60 + istMinute;
 
   // Get gym details to find active shift
   const gym = await Gym.findById(gymId);

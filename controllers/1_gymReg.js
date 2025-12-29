@@ -2,7 +2,7 @@ import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
 import ErrorHandler from "../middlewares/errorMiddlewares.js";
 import Gym from "../models/1_gymModel.js";
 import GymMedia from "../models/2_gymMedialModel.js";
-import {GymAnnouncement} from '../models/23_announcemenetModel.js';
+import { GymAnnouncement } from '../models/23_announcemenetModel.js';
 import UserPlan from "../models/14_userPlanModel.js";
 import VerificationDocument from "../models/1_verificationDoc.js";
 import mongoose from "mongoose";
@@ -10,6 +10,9 @@ import mongoose from "mongoose";
 
 
 export const registerGym = catchAsyncErrors(async (req, res, next) => {
+  console.log("📩 Received Gym Registration Request:", req.body);
+  console.log("👤 User ID from token:", req.user?._id);
+
   const {
     name,
     location,
@@ -20,9 +23,14 @@ export const registerGym = catchAsyncErrors(async (req, res, next) => {
     closeTime,
     contactEmail,
     phone,
+    alternatePhone,
     about,
     equipmentList,
     shifts,
+    gymType,
+    facilities,
+    onboardingStep,
+    pincode,
     // status
   } = req.body;
 
@@ -31,7 +39,7 @@ export const registerGym = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Only gym owners can register gyms", 403));
   }
 
-   // ✅ Check if gym already exists for this owner
+  // ✅ Check if gym already exists for this owner
   const existingGym = await Gym.findOne({ owner: req.user._id });
   if (existingGym) {
     return next(new ErrorHandler("Only one gym can be registered per gym owner", 400));
@@ -51,9 +59,14 @@ export const registerGym = catchAsyncErrors(async (req, res, next) => {
     closeTime,
     contactEmail,
     phone,
+    alternatePhone,
     about,
     equipmentList,
     shifts,
+    gymType,
+    facilities,
+    onboardingStep,
+    pincode,
     owner: req.user._id,
     // status
   });
@@ -72,7 +85,15 @@ export const addUpdateGymMedia = catchAsyncErrors(async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { mediaUrls = [], logoUrl } = req.body;
+    const {
+      mediaUrls = [],
+      logoUrl,
+      frontPhotoUrl,
+      receptionPhotoUrl,
+      workoutFloorPhotoUrl,
+      lockerRoomPhotoUrl,
+      trainerTeamPhotoUrl
+    } = req.body;
     const userId = req.user._id;
 
     // Validate input
@@ -92,19 +113,27 @@ export const addUpdateGymMedia = catchAsyncErrors(async (req, res, next) => {
     if (mediaDoc) {
       // Completely replace mediaUrls array
       mediaDoc.mediaUrls = mediaUrls.filter(url => url.trim() !== "");
-      
+
       // Update logo if provided
-      if (logoUrl && logoUrl.trim() !== "") {
-        mediaDoc.logoUrl = logoUrl;
-      }
-      
+      if (logoUrl && logoUrl.trim() !== "") mediaDoc.logoUrl = logoUrl;
+      if (frontPhotoUrl) mediaDoc.frontPhotoUrl = frontPhotoUrl;
+      if (receptionPhotoUrl) mediaDoc.receptionPhotoUrl = receptionPhotoUrl;
+      if (workoutFloorPhotoUrl) mediaDoc.workoutFloorPhotoUrl = workoutFloorPhotoUrl;
+      if (lockerRoomPhotoUrl) mediaDoc.lockerRoomPhotoUrl = lockerRoomPhotoUrl;
+      if (trainerTeamPhotoUrl) mediaDoc.trainerTeamPhotoUrl = trainerTeamPhotoUrl;
+
       await mediaDoc.save({ session });
     } else {
       // Create new media document
       mediaDoc = await GymMedia.create([{
         gymId: gym._id,
         mediaUrls: mediaUrls.filter(url => url.trim() !== ""),
-        logoUrl: logoUrl?.trim() || ""
+        logoUrl: logoUrl?.trim() || "",
+        frontPhotoUrl,
+        receptionPhotoUrl,
+        workoutFloorPhotoUrl,
+        lockerRoomPhotoUrl,
+        trainerTeamPhotoUrl
       }], { session });
     }
 
@@ -136,7 +165,7 @@ export const getGymDetails = catchAsyncErrors(async (req, res, next) => {
   const gym = await Gym.findById(req.params.id)
     .populate('media')
     .populate('owner', 'name email phone');
-    // .populate('equipmentList'); //ie select not populate
+  // .populate('equipmentList'); //ie select not populate
 
   if (!gym || gym.isDeleted) {
     return next(new ErrorHandler("Gym not found", 404));
@@ -157,9 +186,10 @@ export const getGymDetails = catchAsyncErrors(async (req, res, next) => {
 //update equipment && all legitimate after gymVerified
 export const updateGym = catchAsyncErrors(async (req, res, next) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = ['name', 'capacity', 'openTime', 'closeTime', 
-                        'contactEmail', 'phone', 'about', 'shifts', 'gymSlogan','equipmentList']; //status,gymMedia can updated from diffController, verifiedDocument->not allowed after verification
-                        //location is not allowed to update
+  const allowedUpdates = ['name', 'capacity', 'openTime', 'closeTime',
+    'contactEmail', 'phone', 'alternatePhone', 'about', 'shifts', 'gymSlogan', 'equipmentList',
+    'gymType', 'facilities', 'onboardingStep', 'onboardingStatus', 'pincode', 'location'];
+  // status,gymMedia can updated from diffController, verifiedDocument->not allowed after verification
 
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
@@ -173,8 +203,13 @@ export const updateGym = catchAsyncErrors(async (req, res, next) => {
   });
 
   if (!gym) {
+    console.log("❌ Gym not found or not authorized for ID:", req.params.id, "User:", req.user._id);
     return next(new ErrorHandler("Gym not found or not authorized", 404));
   }
+
+  console.log("📦 Body before update:", req.body);
+  console.log("🛠️ Allowed updates:", allowedUpdates);
+  console.log("🔍 Actual updates requested:", updates);
 
   updates.forEach(update => {
     // Special handling for location coordinates
@@ -189,8 +224,18 @@ export const updateGym = catchAsyncErrors(async (req, res, next) => {
         return next(new ErrorHandler("equipmentList must be an array", 400));
       }
       gym.equipmentList = req.body.equipmentList;
-    } 
-    else {
+    } else if (update === 'location') {
+      // Handle nested location update
+      if (typeof req.body.location === 'object') {
+        gym.location = {
+          address: req.body.location.address || gym.location.address,
+          coordinates: req.body.location.coordinates || gym.location.coordinates
+        };
+      } else {
+        // Fallback for string location if provided
+        gym.location.address = req.body.location;
+      }
+    } else {
       gym[update] = req.body[update];
     }
   });
@@ -240,7 +285,7 @@ export const getAllGyms = catchAsyncErrors(async (req, res, next) => {
 //provide gyms(verificationDoc & ownerDetails) by gymIds (can be used by Admin only), by gymOwner,  Admin (req.body->gymIds)
 export const getGymsByOwner = catchAsyncErrors(async (req, res, next) => {
   const query = { isDeleted: false };
-  
+
   if (req.user.role !== 'Admin') {
     query.owner = req.user._id;
   } else if (req.body.gymIds && req.user.role === 'Admin') {
@@ -259,15 +304,15 @@ export const getGymsByOwner = catchAsyncErrors(async (req, res, next) => {
 //maintainence(with updateGym or, useAnnouncement)
 export const toggleGymStatus = catchAsyncErrors(async (req, res, next) => {
   const gym = await Gym.findOneAndUpdate(
-    { 
+    {
       // _id: req.params.gymId,
-      owner: req.user._id 
+      owner: req.user._id
     },
     // status === 'open' ? 'closed' : 'open'
-    { $set: { status: { $cond: { if: { $eq: ['$status', 'open'] }, then: 'closed', else: 'open' }} }},
+    { $set: { status: { $cond: { if: { $eq: ['$status', 'open'] }, then: 'closed', else: 'open' } } } },
     { new: true }// returns the updated document
   );
-// ❌ No, .save() is not required.
+  // ❌ No, .save() is not required.
   if (!gym) {
     return next(new ErrorHandler("Gym not found or unauthorized", 404));
   }
@@ -278,7 +323,7 @@ export const toggleGymStatus = catchAsyncErrors(async (req, res, next) => {
 
 //same handel, addition && updation of verificationDocument till isVerified:false
 export const addUpdateVerificationDocuments = catchAsyncErrors(async (req, res, next) => {
-  const { documentUrls = [] } = req.body;
+  const { documentUrls = [], gstUrl, idProofUrl, certificationUrl } = req.body;
   // const { gymId } = req.params;
   // 🔍 Find the gym that this user owns
   const gym = await Gym.findOne({ owner: req.user._id });
@@ -294,7 +339,12 @@ export const addUpdateVerificationDocuments = catchAsyncErrors(async (req, res, 
 
   let doc = await VerificationDocument.findOneAndUpdate(
     { gymId: gym._id },
-    { documentUrls },
+    {
+      documentUrls,
+      gstUrl,
+      idProofUrl,
+      certificationUrl
+    },
     { new: true, upsert: true }
   );
 
@@ -312,8 +362,8 @@ export const createGymAnnouncement = catchAsyncErrors(async (req, res, next) => 
   const { message } = req.body;
   // const { gymId } = req.params;
 
-   
-   // 🔍 Find the gym that this user owns
+
+  // 🔍 Find the gym that this user owns
   const gym = await Gym.findOne({ owner: req.user._id });
   if (!gym) {
     return next(new ErrorHandler('Gym not found for this user.', 404));
@@ -332,26 +382,26 @@ export const createGymAnnouncement = catchAsyncErrors(async (req, res, next) => 
   // }).select('userId');
 
   const userPlans = await UserPlan.aggregate([
-  { $match: { gymId: new mongoose.Types.ObjectId(gymId), isExpired: false } },
-  {
-    $group: {
-      _id: "$userId", // group by userId
+    { $match: { gymId: new mongoose.Types.ObjectId(gymId), isExpired: false } },
+    {
+      $group: {
+        _id: "$userId", // group by userId
+      }
+    },
+    {
+      $project: {
+        userId: "$_id",
+        _id: 0
+      }
     }
-  },
-  {
-    $project: {
-      userId: "$_id",
-      _id: 0
-    }
-  }
-]);
+  ]);
 
   // console.log("userPlans: ", userPlans);
-  
-// const targetUsers = userPlans.length > 0 ? userPlans.map(p => p.userId) : [];
-// Extract ObjectIds only
-const targetUsers = userPlans.map(p => p.userId); // this works even if array is empty
-  
+
+  // const targetUsers = userPlans.length > 0 ? userPlans.map(p => p.userId) : [];
+  // Extract ObjectIds only
+  const targetUsers = userPlans.map(p => p.userId); // this works even if array is empty
+
 
   const announcement = await GymAnnouncement.create({
     gymId,
@@ -366,7 +416,7 @@ const targetUsers = userPlans.map(p => p.userId); // this works even if array is
 //getAnnouncementFromGym && also, another route for getAnnouncementFromAdmin
 export const getUserAnnouncementsByGym = catchAsyncErrors(async (req, res, next) => {
   const userId = req.user._id;
-  const role=req.user.role;
+  const role = req.user.role;
   let gymIds = [];
 
   if (role === 'GymOwner') {
@@ -387,13 +437,13 @@ export const getUserAnnouncementsByGym = catchAsyncErrors(async (req, res, next)
   // const gymIds = userPlans.map(plan => plan.gymId); //if no userPlan..??
 
   const announcements = await GymAnnouncement.find({ gymId: { $in: gymIds } })
-  .select('message gymId createdAt updatedAt') // Include 'message' and 'gymId' (needed for populate)
-  .populate({
-    path: 'gymId',
-    select: 'name', // Only get the 'name' field from Gym
-  }).sort({ createdAt: -1 });
-    
-    // .select('message') // Only include 'message' field
+    .select('message gymId createdAt updatedAt') // Include 'message' and 'gymId' (needed for populate)
+    .populate({
+      path: 'gymId',
+      select: 'name', // Only get the 'name' field from Gym
+    }).sort({ createdAt: -1 });
+
+  // .select('message') // Only include 'message' field
 
   res.status(200).json({ success: true, announcements });
 });

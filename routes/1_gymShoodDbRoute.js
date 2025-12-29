@@ -89,6 +89,7 @@ const validateGymRegistration = [
   body('closeTime').notEmpty().withMessage('Closing time is required'),
   body('contactEmail').isEmail().withMessage('Invalid email format'),
   body('phone').notEmpty().withMessage('Phone number is required'),
+  body('pincode').optional().isLength({ min: 6, max: 6 }).withMessage('Pincode must be 6 digits'),
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

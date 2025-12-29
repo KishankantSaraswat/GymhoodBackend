@@ -1,5 +1,8 @@
 import express from "express";
-import { config } from "dotenv"; config({ path: "./config/config.env" });
+import dotenv from "dotenv";
+dotenv.config({ path: "./config/config.env" });
+const startupKey = (process.env.JWT_SECRET_KEY || "").trim().replace(/^["']|["']$/g, '');
+console.log(`🚀 Server starting. JWT Key Fingerprint: ${startupKey.substring(0, 2)}...${startupKey.substring(startupKey.length - 2)} (Length: ${startupKey.length})`);
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import path from "path";
@@ -14,12 +17,12 @@ import paymentRouter from "./routes/payment.routes.js"
 import healthChgymsHoodeckRouter from "./routes/healthCheck.js"
 // import { gymDailyEarning } from "./services/cronJobs.js";
 import userDataRouter from "./routes/userDataRoutes.js";
+import { upload } from "./middlewares/multer.js";
 
 
 export const app = express();
 
-import dotenv from 'dotenv';
-dotenv.config({ path: './config/config.env' });
+// Removed redundant dotenv config
 import { OAuth2Client } from 'google-auth-library';
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -31,6 +34,7 @@ app.use(cors({
     'https://gyms-hood.vercel.app',
     'http://localhost:3000',
     'http://localhost:3000/googleAuth',
+    'http://localhost:5173',
     'http://192.168.1.137:8000',
     'http://192.168.1.137:6000',
     'http://192.168.1.137:5000',
@@ -98,6 +102,22 @@ app.get("/ping", (req, res) => {
   console.log("Ping hit!");
   const user = req.query.name || "Guest";
   res.json({ message: `Pong, ${user}` });
+});
+
+// Real-time File Upload Route (integrated from fileServer)
+app.post("/upload", upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+
+  const fileUrl = `${req.protocol}://${req.get('host')}/files/${req.file.filename}`;
+
+  res.status(201).json({
+    success: true,
+    message: 'File uploaded successfully',
+    filename: req.file.filename,
+    url: fileUrl
+  });
 });
 
 
