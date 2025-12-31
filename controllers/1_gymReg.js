@@ -337,6 +337,15 @@ export const addUpdateVerificationDocuments = catchAsyncErrors(async (req, res, 
     return next(new ErrorHandler("Cannot update documents after verification", 400));
   }
 
+  // Validate that all provided documents are PDFs
+  const isPdf = (url) => typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+
+  if ((gstUrl && !isPdf(gstUrl)) ||
+    (idProofUrl && !isPdf(idProofUrl)) ||
+    (certificationUrl && !isPdf(certificationUrl))) {
+    return next(new ErrorHandler("Verification documents must be PDF files", 400));
+  }
+
   let doc = await VerificationDocument.findOneAndUpdate(
     { gymId: gym._id },
     {

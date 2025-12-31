@@ -17,9 +17,10 @@ import {
   toggleGymVerification,
   toggleGymDeletion,
   getUnverifiedGyms,
+  getAllGymsForAdmin,
   createAnnouncement,
 
-  
+
   getUsersByQuery,
   getGymsByQuery,
   getUserAnnouncements,
@@ -39,14 +40,15 @@ const router = express.Router();
 router.put('/gym/:gymId/toggle-verify', isAuthenticated, isAdmin, toggleGymVerification);
 router.put('/gym/:gymId/toggle-delete', isAuthenticated, isAdmin, toggleGymDeletion);
 router.get('/gyms/unverified', isAuthenticated, isAdmin, getUnverifiedGyms);
+router.get('/gyms/admin-all', isAuthenticated, isAdmin, getAllGymsForAdmin);
 
 // User Management (users->get Users,GymOwner,Admin)
 router.get("/users", isAuthenticated, isAdmin, getUsersByQuery);
 // Gym Management
 router.get("/gyms", isAuthenticated, isAdmin, getGymsByQuery); //add rating query also, (or, by frontend : easily)
 // Announcement Management
-router.post("/announcements", 
-  isAuthenticated, 
+router.post("/announcements",
+  isAuthenticated,
   isAdmin,
   // validateAnnouncement,
   createAnnouncement
@@ -54,8 +56,8 @@ router.post("/announcements",
 router.get("/announcements/user", isAuthenticated, getUserAnnouncements);
 router.delete("/announcements/:announcementId", isAuthenticated, isAdmin, deleteAnnouncement);
 router.get("/plans/search", getPlansByQuery);
-router.put("/plans/factor", 
-  isAuthenticated, 
+router.put("/plans/factor",
+  isAuthenticated,
   isAdmin,
   updatePlanFactor
 );

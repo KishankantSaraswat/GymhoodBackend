@@ -233,21 +233,37 @@ export const verifyPlanPayment = catchAsyncErrors(async (req, res, next) => {
     });
 
     let factor = 1;
+
     let totalDays = 0;
-    if (plan.planType.trim() === "1 day") {
-      factor = 7;
+
+    // Normalize planType for case-insensitive comparison
+    const normalizedType = plan.planType ? plan.planType.trim().toLowerCase() : "";
+
+    // Priority 1: Use explicit validity from plan settings
+    if (plan.validity && plan.validity > 0) {
+      totalDays = plan.validity;
+      factor = plan.validity;
+    }
+    // Priority 2: Fallback to planType defaults if validity is missing
+    else if (normalizedType === "1 day") {
+      factor = 1;
       totalDays = 1;
-    } else if (plan.planType.trim() === "7 days") {
-      factor = 30;
+    } else if (normalizedType === "7 days") {
+      factor = 7;
       totalDays = 7;
     }
-    else if (plan.planType.trim() === "15 days") {
-      factor = 45;
+    else if (normalizedType === "15 days") {
+      factor = 15;
       totalDays = 15;
     }
-    else if (plan.planType.trim() === "1 month") {
-      factor = 90;
+    else if (normalizedType === "1 month" || normalizedType === "monthly") {
+      factor = 30;
       totalDays = 30;
+    }
+    else {
+      // Default fallback
+      factor = 1;
+      totalDays = 1;
     }
 
     // 6. Create user plan
