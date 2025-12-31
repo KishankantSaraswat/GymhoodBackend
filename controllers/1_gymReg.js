@@ -125,7 +125,7 @@ export const addUpdateGymMedia = catchAsyncErrors(async (req, res, next) => {
       await mediaDoc.save({ session });
     } else {
       // Create new media document
-      mediaDoc = await GymMedia.create([{
+      const createdDocs = await GymMedia.create([{
         gymId: gym._id,
         mediaUrls: mediaUrls.filter(url => url.trim() !== ""),
         logoUrl: logoUrl?.trim() || "",
@@ -135,6 +135,7 @@ export const addUpdateGymMedia = catchAsyncErrors(async (req, res, next) => {
         lockerRoomPhotoUrl,
         trainerTeamPhotoUrl
       }], { session });
+      mediaDoc = createdDocs[0];
     }
 
     // Ensure gym references the media document

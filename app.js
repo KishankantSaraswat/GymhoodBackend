@@ -111,7 +111,7 @@ app.post("/upload", upload.single('file'), (req, res) => {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
 
-  const fileUrl = `/files/${req.file.filename}`;
+  const fileUrl = `${req.protocol}://${req.get('host')}/files/${req.file.filename}`;
 
   res.status(201).json({
     success: true,

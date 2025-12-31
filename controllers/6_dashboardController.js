@@ -1,5 +1,6 @@
 import UserPlan from "../models/14_userPlanModel.js";
-import {GymPlanRevenue,AnalyticsCache} from "../models/4_gymPlanRevenueModel.js";
+import GymDailyStats from "../models/7_gymDailyStatsModel.js";
+import { GymPlanRevenue, AnalyticsCache } from "../models/4_gymPlanRevenueModel.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
 import ErrorHandler from "../middlewares/errorMiddlewares.js";
 import Gym from "../models/1_gymModel.js";
@@ -12,13 +13,13 @@ import mongoose from "mongoose";
 export const getGymDashboardStats = catchAsyncErrors(async (req, res) => {
   const { gymId } = req.params;
   const gym = await Gym.findById(gymId);
-  
+
   if (!gym) {
     return next(new ErrorHandler("Gym not found", 404));
   }
 
   // Get users within 15km radius
-  const allUsers = await User.find({ 
+  const allUsers = await User.find({
     role: 'User',
     location: { $exists: true } //who provided their location, getLocation also when qrCheckIn**
   }).select('name email location profile_picture');
@@ -45,7 +46,7 @@ export const getGymDashboardStats = catchAsyncErrors(async (req, res) => {
 export const getRevenueAnalytics = catchAsyncErrors(async (req, res, next) => {
   const userId = req.user._id;
   const currentDate = new Date();
-  
+
   // 1. Get the gym
   const gym = await Gym.findOne({ owner: userId });
   if (!gym) return next(new ErrorHandler("Gym not found", 404));
@@ -58,7 +59,7 @@ export const getRevenueAnalytics = catchAsyncErrors(async (req, res, next) => {
 
   // 3. Determine the cutoff date (24 hours ago) ////24*60*60*1000
   // after each 30sec..get updatedData..as use cached && current(small)-->quick merge && send && update cahce...(as old not need to compute)
-  const cutoffDate = new Date(currentDate.getTime() - 30 * 1000); 
+  const cutoffDate = new Date(currentDate.getTime() - 30 * 1000);
   // Multiple requests within 30s will keep seeing the same cached data
 
   // 4. If fresh cache exists, use it completely
@@ -74,9 +75,9 @@ export const getRevenueAnalytics = catchAsyncErrors(async (req, res, next) => {
   // if (cachedData?.updatedAt) {
   //   query.date = { $gte: cachedData.updatedAt };
   // }
-if (cachedData?.updatedAt) { //as date-->will missTheData..
-  query.createdAt = { $gte: cachedData.updatedAt }; // Use createdAt instead of date
-}
+  if (cachedData?.updatedAt) { //as date-->will missTheData..
+    query.createdAt = { $gte: cachedData.updatedAt }; // Use createdAt instead of date
+  }
 
   const newRevenueRecords = await GymPlanRevenue.find(query);
 
@@ -84,9 +85,9 @@ if (cachedData?.updatedAt) { //as date-->will missTheData..
   // But MongoDB timestamps can have millisecond differences that cause misses
 
   // console.log("Below unable to fetch-->newRecords..")
-//   console.log('Cache exists:', !!cachedData);
-// console.log('New records found:', newRevenueRecords.length);
-// console.log('Last cache update:', cachedData?.updatedAt);
+  //   console.log('Cache exists:', !!cachedData);
+  // console.log('New records found:', newRevenueRecords.length);
+  // console.log('Last cache update:', cachedData?.updatedAt);
 
   // 6. If no cached data exists, process everything fresh
   if (!cachedData) {
@@ -110,14 +111,14 @@ if (cachedData?.updatedAt) { //as date-->will missTheData..
 
 // Helper function to process raw revenue records
 function processRevenueAnalytics(records) {
-  
+
   const groupByTimePeriod = (records, period) => {
     const grouped = {};
-    
+
     records.forEach(record => {
       const date = new Date(record.date);
       let key;
-      
+
       if (period === 'daily') {
         key = date.toISOString().split('T')[0]; // YYYY-MM-DD
       } else if (period === 'weekly') {
@@ -128,22 +129,22 @@ function processRevenueAnalytics(records) {
       } else if (period === 'yearly') {
         key = date.getFullYear();
       }
-      
+
       if (!grouped[key]) {
         grouped[key] = {
           total: 0,
           plans: {}
         };
       }
-      
+
       grouped[key].total += record.revenue;
-      
+
       if (!grouped[key].plans[record.planId]) {
         grouped[key].plans[record.planId] = 0;
       }
       grouped[key].plans[record.planId] += record.revenue;
     });
-    
+
     return grouped;
   };
 
@@ -155,46 +156,46 @@ function processRevenueAnalytics(records) {
   };
 }
 
- const getWeekNumber = (date) => {
-    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-  };  
+const getWeekNumber = (date) => {
+  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+  const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+  return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+};
 
-  // Format data into arrays for charts
-  function formatData(groupedData) {
-    const dates = Object.keys(groupedData).sort();
-    const totals = dates.map(date => groupedData[date].total);
-    
-    // Get all unique plan IDs across all dates
-    const allPlanIds = new Set();
-    dates.forEach(date => {
-      Object.keys(groupedData[date].plans).forEach(planId => {
-        allPlanIds.add(planId);
-      });
+// Format data into arrays for charts
+function formatData(groupedData) {
+  const dates = Object.keys(groupedData).sort();
+  const totals = dates.map(date => groupedData[date].total);
+
+  // Get all unique plan IDs across all dates
+  const allPlanIds = new Set();
+  dates.forEach(date => {
+    Object.keys(groupedData[date].plans).forEach(planId => {
+      allPlanIds.add(planId);
     });
-    
-    // Create series for each plan
-    const planSeries = {};
-    Array.from(allPlanIds).forEach(planId => {
-      planSeries[planId] = dates.map(date => 
-        groupedData[date].plans[planId] || 0
-      );
-    });
-    
-    return {
-      dates,
-      totals,
-      planSeries
-    };
-  }
+  });
+
+  // Create series for each plan
+  const planSeries = {};
+  Array.from(allPlanIds).forEach(planId => {
+    planSeries[planId] = dates.map(date =>
+      groupedData[date].plans[planId] || 0
+    );
+  });
+
+  return {
+    dates,
+    totals,
+    planSeries
+  };
+}
 
 // Helper function to merge cached and new data
 
 function mergeRevenueData(cachedData, newRecords) {
   // First process just the new records
   const newData = processRevenueAnalytics(newRecords);
-  
+
   // If no cached data exists, just return the new data
   if (!cachedData) return newData;
 
@@ -294,7 +295,7 @@ async function updateAnalyticsCache(gymId, type, data) {
 export const getMemberAnalytics = catchAsyncErrors(async (req, res, next) => {
   const userId = req.user._id;
   const currentDate = new Date();
-  
+
   // 1. Get the gym
   const gym = await Gym.findOne({ owner: userId });
   if (!gym) return next(new ErrorHandler("Gym not found", 404));
@@ -316,15 +317,15 @@ export const getMemberAnalytics = catchAsyncErrors(async (req, res, next) => {
     isExpired: false
   }).populate("planId", "name planType"); // ✅ populate only planName from Plan;
 
-//   {
-//   "byPlan": {
-//     "plan123": {
-//       "count": 5,
-//       "planName": "Monthly Premium",
-//       "planType": "Monthly"
-//     }
-//   }
-// }
+  //   {
+  //   "byPlan": {
+  //     "plan123": {
+  //       "count": 5,
+  //       "planName": "Monthly Premium",
+  //       "planType": "Monthly"
+  //     }
+  //   }
+  // }
 
 
   // 5. Process plan distribution (always fresh)
@@ -332,7 +333,7 @@ export const getMemberAnalytics = catchAsyncErrors(async (req, res, next) => {
 
   // 6. Handle member growth data
   let memberGrowth;
-  
+
   if (cachedData?.updatedAt >= cutoffDate) {
     // Use cached growth data if fresh
     memberGrowth = cachedData.data.memberGrowth;
@@ -342,18 +343,18 @@ export const getMemberAnalytics = catchAsyncErrors(async (req, res, next) => {
     if (cachedData?.updatedAt) {
       query.purchaseDate = { $gte: cachedData.updatedAt };
     }
-    
+
     const newUserPlans = await UserPlan.find(query);
-    const allUserPlans = cachedData 
+    const allUserPlans = cachedData
       ? [...cachedData.data.allUserPlans, ...newUserPlans]
       : newUserPlans;
-      
+
     memberGrowth = calculateMemberGrowth(allUserPlans);
-    
+
     // Update cache with all historical data
     await AnalyticsCache.findOneAndUpdate(
       { gymId: gym._id, type: 'members' },
-      { 
+      {
         data: {
           planDistribution, // Note: This will be stale until next cache update
           memberGrowth,
@@ -387,8 +388,8 @@ function calculatePlanDistribution(activeUserPlans) {
 
   activeUserPlans.forEach(plan => {
     // const planId = plan.planId.toString();
-    const planId= plan.planId._id.toString();
-    
+    const planId = plan.planId._id.toString();
+
     if (!distribution.byPlan[planId]) {
       distribution.byPlan[planId] = {
         count: 0,
@@ -396,7 +397,7 @@ function calculatePlanDistribution(activeUserPlans) {
         planType: plan.planId?.planType // Adding plan type if available
       };
     }
-    
+
     distribution.byPlan[planId].count++;
     distribution.totalActiveUsers++;
   });
@@ -413,11 +414,11 @@ function calculateMemberGrowth(userPlans) {
   // Helper function to group by time period
   const groupByTimePeriod = (records, period) => {
     const grouped = {};
-    
+
     records.forEach(record => {
       const date = new Date(record.purchaseDate);
       let key;
-      
+
       if (period === 'daily') {
         key = date.toISOString().split('T')[0]; // YYYY-MM-DD
       } else if (period === 'weekly') {
@@ -427,11 +428,11 @@ function calculateMemberGrowth(userPlans) {
       } else if (period === 'yearly') {
         key = date.getFullYear();
       }
-      
+
       if (!grouped[key]) grouped[key] = 0;
       grouped[key]++;
     });
-    
+
     return grouped;
   };
 
@@ -446,13 +447,13 @@ function calculateMemberGrowth(userPlans) {
   const formatGrowthData = (groupedData) => {
     const sortedDates = Object.keys(groupedData).sort();
     const counts = sortedDates.map(date => groupedData[date]);
-    
+
     // Calculate cumulative growth
     const cumulative = counts.reduce((acc, curr, i) => {
-      acc.push(i === 0 ? curr : acc[i-1] + curr);
+      acc.push(i === 0 ? curr : acc[i - 1] + curr);
       return acc;
     }, []);
-    
+
     return {
       dates: sortedDates,
       counts,
@@ -467,3 +468,153 @@ function calculateMemberGrowth(userPlans) {
     yearly: formatGrowthData(groupByTimePeriod(userPlans, 'yearly'))
   };
 }
+
+/**
+ * @description Get detailed list of members (Active/Expired)
+ * @route GET /api/dashboard/members/list/:gymId?type=active|expired
+ * @access Private (Gym Owner)
+ */
+export const getActiveMemberDetails = catchAsyncErrors(async (req, res, next) => {
+  const { gymId } = req.params;
+  const { type = 'active' } = req.query; // 'active' or 'expired'
+
+  const query = { gymId };
+
+  if (type === 'expired') {
+    query.isExpired = true;
+  } else {
+    // Default to active
+    query.isExpired = false;
+  }
+
+  // 1. Find user plans based on status
+  const userPlans = await UserPlan.find(query)
+    .populate({
+      path: 'userId',
+      select: 'name email phone photo gender' // valid fields from User model
+    })
+    .populate({
+      path: 'planId',
+      select: 'name planType duration'
+    })
+    .sort({ purchaseDate: -1 });
+
+  // 2. Format the response
+  const members = userPlans.map(plan => {
+    // If user deleted account or null
+    if (!plan.userId) return null;
+
+    const remainingDays = Math.max(0, Math.ceil((new Date(plan.maxExpiryDate) - new Date()) / (1000 * 60 * 60 * 24)));
+
+    return {
+      _id: plan.userId._id, // User ID
+      planId: plan._id, // User Plan ID
+      name: plan.userId.name,
+      email: plan.userId.email,
+      phone: plan.userId.phone,
+      photo: plan.userId.photo,
+      gender: plan.userId.gender,
+
+      planName: plan.planId?.name || 'Unknown Plan',
+      planType: plan.planId?.planType,
+
+      joinDate: plan.purchaseDate,
+      expiryDate: plan.maxExpiryDate,
+      remainingDays: type === 'expired' ? 0 : remainingDays,
+
+      totalDays: plan.totalDays,
+      usedDays: plan.usedDays,
+      status: type === 'expired' ? 'Expired' : 'Active'
+    };
+  }).filter(member => member !== null);
+
+  res.status(200).json({
+    success: true,
+    count: members.length,
+    members
+  });
+});
+
+/**
+ * @description Get single member full details
+ * @route GET /api/dashboard/member/details/:planId
+ * @access Private (Gym Owner)
+ */
+export const getSingleMemberDetails = catchAsyncErrors(async (req, res, next) => {
+  const { planId } = req.params;
+
+  // 1. Get UserPlan details
+  const userPlan = await UserPlan.findById(planId)
+    .populate({
+      path: 'userId',
+      select: 'name email phone photo gender'
+    })
+    .populate({
+      path: 'planId',
+      select: 'name planType duration'
+    });
+
+  if (!userPlan) {
+    return next(new ErrorHandler("Member plan not found", 404));
+  }
+
+  const userId = userPlan.userId._id;
+  const gymId = userPlan.gymId;
+
+  // 2. Calculate workout duration from GymDailyStats
+  const stats = await GymDailyStats.find({
+    gymId: gymId,
+    'register.userId': userId
+  }).select('register');
+
+  let totalDurationMinutes = 0;
+
+  stats.forEach(dayStat => {
+    const userEntries = dayStat.register.filter(r => r.userId?.toString() === userId.toString());
+
+    userEntries.forEach(userEntry => {
+      if (userEntry.checkInTime) {
+        const endTime = userEntry.checkOutTimeReal || userEntry.checkOutTimeCalc;
+        if (endTime) {
+          const durationMs = new Date(endTime) - new Date(userEntry.checkInTime);
+          if (durationMs > 0) {
+            totalDurationMinutes += Math.floor(durationMs / (1000 * 60));
+          }
+        }
+      }
+    });
+  });
+
+  const durationHours = (totalDurationMinutes / 60).toFixed(1);
+
+  const remainingDays = Math.max(0, Math.ceil((new Date(userPlan.maxExpiryDate) - new Date()) / (1000 * 60 * 60 * 24)));
+
+  const memberDetails = {
+    _id: userPlan.userId._id,
+    planId: userPlan._id,
+    name: userPlan.userId.name,
+    email: userPlan.userId.email,
+    phone: userPlan.userId.phone,
+    photo: userPlan.userId.photo,
+    gender: userPlan.userId.gender,
+
+    planName: userPlan.planId?.name || 'Unknown Plan',
+    planType: userPlan.planId?.planType,
+    planDuration: userPlan.planDuration,
+
+    amountDeducted: userPlan.amountDeducted,
+    purchaseDate: userPlan.purchaseDate,
+    usedDays: userPlan.usedDays,
+    expiryDate: userPlan.maxExpiryDate,
+    isExpired: userPlan.isExpired,
+    remainingDays,
+
+    workoutDurationHours: durationHours,
+    refundHistory: userPlan.metadata?.refundHistory || []
+  };
+
+  res.status(200).json({
+    success: true,
+    member: memberDetails
+  });
+});

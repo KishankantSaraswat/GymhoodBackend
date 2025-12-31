@@ -68,7 +68,9 @@ import {
 import {
   getGymDashboardStats,
   getRevenueAnalytics,
-  getMemberAnalytics
+  getMemberAnalytics,
+  getActiveMemberDetails,
+  getSingleMemberDetails
 } from "../controllers/6_dashboardController.js";
 
 
@@ -202,6 +204,8 @@ router.get("/gym/:gymId/active-capacity", getActiveCapacity); // 9. Get Active C
 router.get("/dashboard/stats/:gymId", isAuthenticated, isGymOwner, getGymDashboardStats);
 router.get("/dashboard/revenue/:gymId", isAuthenticated, isGymOwner, getRevenueAnalytics);
 router.get("/dashboard/members/:gymId", isAuthenticated, isGymOwner, getMemberAnalytics);
+router.get("/dashboard/members/list/:gymId", isAuthenticated, isGymOwner, getActiveMemberDetails);
+router.get("/dashboard/member/details/:planId", isAuthenticated, isGymOwner, getSingleMemberDetails);
 
 export default router;
 
