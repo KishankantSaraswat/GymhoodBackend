@@ -478,7 +478,6 @@ export const deleteGymAnnouncement = catchAsyncErrors(async (req, res, next) => 
     return next(new ErrorHandler("Announcement not found or unauthorized", 404));
   }
 
-  await announcement.deleteOne();
   res.status(200).json({ success: true, message: "Announcement deleted" });
 });
 

@@ -19,6 +19,7 @@ import {
   getUnverifiedGyms,
   getAllGymsForAdmin,
   createAnnouncement,
+  getGymDetailsAdmin,
 
 
   getUsersByQuery,
@@ -26,7 +27,8 @@ import {
   getUserAnnouncements,
   deleteAnnouncement,
   updatePlanFactor,
-  getPlansByQuery
+  getPlansByQuery,
+  getAdminDashboardStats
 } from '../controllers/2_adminController.js';
 
 //   getActivePlans,
@@ -41,6 +43,8 @@ router.put('/gym/:gymId/toggle-verify', isAuthenticated, isAdmin, toggleGymVerif
 router.put('/gym/:gymId/toggle-delete', isAuthenticated, isAdmin, toggleGymDeletion);
 router.get('/gyms/unverified', isAuthenticated, isAdmin, getUnverifiedGyms);
 router.get('/gyms/admin-all', isAuthenticated, isAdmin, getAllGymsForAdmin);
+router.get('/gym/:gymId/details', isAuthenticated, isAdmin, getGymDetailsAdmin);
+router.get('/stats', isAuthenticated, isAdmin, getAdminDashboardStats);
 
 // User Management (users->get Users,GymOwner,Admin)
 router.get("/users", isAuthenticated, isAdmin, getUsersByQuery);

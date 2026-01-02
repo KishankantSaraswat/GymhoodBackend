@@ -111,7 +111,9 @@ app.post("/upload", upload.single('file'), (req, res) => {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
 
-  const fileUrl = `${req.protocol}://${req.get('host')}/files/${req.file.filename}`;
+  // const fileUrl = `${req.protocol}://${req.get('host')}/files/${req.file.filename}`;
+  const fileUrl = `/files/${req.file.filename}`;
+
 
   res.status(201).json({
     success: true,
@@ -131,7 +133,7 @@ app.use(errorMiddleware);
 
 // Start server if this file is run directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const PORT = process.env.PORT || 4000;
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on port ${PORT}`);
   });
